@@ -53,9 +53,9 @@ SELECT set_chunk_time_interval('event_history', INTERVAL '1 hour');
 ```
 
 ## Continuous aggregations
-Continuous aggregations allow to main fast access to per-hour aggregates. 
+Continuous aggregations allow to maintain fast access to per-hour aggregates. 
 
-Writings are still fast. Re-calculations are happening as schedules background jobs.
+Writings are still fast. Re-calculations are happening as schedules background jobs. 
 
 So, for old data we have a chance to observe slightly outdated report.
 
