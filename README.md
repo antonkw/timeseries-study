@@ -53,9 +53,14 @@ SELECT set_chunk_time_interval('event_history', INTERVAL '1 hour');
 ```
 
 ## Continuous aggregations
-Continuous aggregations allow to main fast access to per-hour aggregates. Writings are still fast. Re-calculations are happening as schedules background jobs.
-So, for old date we have a chance to observe slightly outdated report.
-But the latest hour is still actual since the delta (new records) is being taken into account.
+Continuous aggregations allow to main fast access to per-hour aggregates. 
+
+Writings are still fast. Re-calculations are happening as schedules background jobs.
+
+So, for old data we have a chance to observe slightly outdated report.
+
+But the latest hour is actual. It is necessary to denote that there is still no full-scan even of the latest chunk.
+Materialized aggregate is being taken into account, and only delta (new records) undergo per-request processing.
 ```sql
 CREATE MATERIALIZED VIEW events_summary_hourly
     WITH (timescaledb.continuous) AS
