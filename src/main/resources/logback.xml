@@ -1,0 +1,20 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} %-35thread %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <timestamp key="byDay" datePattern="yyyyMMdd"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <logger name="http4s"/>
+    <logger name="org.http4s" level="INFO"/>
+
+    <logger name="http4s" level="INFO"/>
+    <logger name="org.http4s" level="INFO"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+
+</configuration>
