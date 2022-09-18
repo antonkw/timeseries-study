@@ -1,0 +1,11 @@
+version: "3.3"
+services:
+  timescaledb:
+    build:
+      context: Docker
+      dockerfile: Docker/timescale.Dockerfile
+    environment:
+        POSTGRES_PASSWORD: p_318Jhs&2
+        POSTGRES_USER: timescale
+    ports:
+      - 5432:5432

@@ -17,7 +17,7 @@ object Dependencies {
     val ciris      = "2.3.3"
 
     val skunk     = "0.3.1"
-    val weaver    = "0.7.2"
+    val weaver    = "0.8.0"
     val scalatest = "3.2.11"
     val tapir     = "1.1.0"
 

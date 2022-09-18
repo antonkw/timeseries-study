@@ -16,11 +16,23 @@ ThisBuild / scalacOptions ++= Seq(
   "-Ymacro-annotations"
 )
 
-lazy val root = (project in file("."))
+def dockerSettings(name: String) = List(
+  Docker / packageName := s"timeseries-study-$name",
+  dockerBaseImage := "jdk17-curl:latest",
+  dockerExposedPorts ++= List(8080),
+  makeBatScripts := Nil,
+  dockerUpdateLatest := true
+)
+
+lazy val app = (project in file("./modules/core"))
+  .enablePlugins(DockerPlugin)
+  .enablePlugins(AshScriptPlugin)
+  .settings(dockerSettings("ws"))
   .settings(
     name := "timeseries",
     libraryDependencies ++= Seq(
           compilerPlugin(CompilerPlugins.`context-applied`),
+          compilerPlugin(CompilerPlugins.`kind-projector`),
           Libraries.enumeratum,
           Libraries.skunkCore,
           Libraries.skunkRefined,
@@ -36,6 +48,33 @@ lazy val root = (project in file("."))
           Libraries.tapirSwagger,
           Libraries.tapirHttp4s,
           Libraries.http4sBlaze,
-          Libraries.newtype
+          Libraries.newtype,
+          Libraries.weaverCats
         )
   )
+
+lazy val tests = {
+  (project in file("./modules/tests"))
+    .configs(IntegrationTest)
+    .settings(
+      name := "int-tests",
+      IntegrationTest / parallelExecution := false,
+      Defaults.itSettings,
+      testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+      libraryDependencies ++= Seq(
+            Libraries.weaverCats,
+            Libraries.weaverScalaCheck,
+            Libraries.scalatest
+          )
+    )
+    .dependsOn(app)
+}
+
+lazy val root =
+  project
+    .in(file("."))
+    .settings(
+      name := "timeseries-study",
+      Compile / run := (app / Compile / run).evaluated
+    )
+    .aggregate(app, tests)
