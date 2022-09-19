@@ -65,6 +65,11 @@ Responses are helpful and will let you know what went wrong:
 ``` 
 Invalid value for: query parameter timestamp (expected value to be greater than 1262300400, but was 123)
 ```
+Refined types encode such kind of validation as:
+```scala
+type EventTimestampPred = Long Refined And[Greater[1262300400L], Less[7289564400L]] 
+```
+So, you need to be careful during domain modelling and rest of things are derived automatically. 
 
 ## Run with SBT
 
@@ -102,14 +107,6 @@ sbt IntegrationTest/test
 ```
 
 Please note that test cases are cleaning DB. So, DB will be emptied.
-
-# Endpoints
-
-## Swagger
-
-[http://localhost:8080/docs](http://localhost:8080/docs) is full-featured Swagger.
-
-![image info](./pics/post_screenshot.jpg)
 
 # Solution
 
