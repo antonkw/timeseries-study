@@ -10,7 +10,7 @@ Requirements:
 
 ## Run with Docker
 
-Fully dockerized running is preferable since it fixes JDK for running the app.
+Running in Docker is preferable. Environment (for app itself) is fully reproducible in that case.
 
 ### Basic JDK image
 
@@ -36,14 +36,14 @@ docker compose build --no-cache
 ### Run
 
 Both DB and App will be in place after the command:
-
 ``` 
 docker compose up
 ```
 
-You can notice that app tries to connect earlier than necessary. It
-causes `java.net.ConnectException: Connection refused
-`. Healthcheck for Timescale should be improved. Docker restarts it, and it should be ok after the second round.
+You can notice that for the first time app tries to connect to DB earlier than necessary. It causes `java.net.ConnectException: Connection refused`. 
+Healthcheck for Timescale should be improved to trigger app deployment after Timescale is really up and running. 
+Docker restarts container with the app, it is ok after the second round.
+
 You will see following lines:
 ![image info](./pics/docker-started.jpg)
 Feel free copy current timestamp and click the link to play around with the app.
@@ -51,7 +51,7 @@ Feel free copy current timestamp and click the link to play around with the app.
 Validation is lifted to Swagger automatically, it helps to not send invalid requests.
 ![image info](./pics/swagger.jpg)
 
-Feel free to send requests directly:
+Feel free to send bad requests directly:
 
 ```
 curl -X 'POST' \
@@ -72,6 +72,11 @@ Invalid value for: query parameter timestamp (expected value to be greater than 
 
 ```
 docker compose build --no-cache
+```
+
+### Run DB only (and detach)
+
+```
 docker-compose up -d timescaledb
 ```
 
@@ -106,63 +111,39 @@ Please note that test cases are cleaning DB. So, DB will be emptied.
 
 ![image info](./pics/post_screenshot.jpg)
 
-# Description
+# Solution
 
-The project leverages features of [Timescale](https://www.timescale.com/). It is a product built on the top of Postgres.
+The project leverages features of [TimescaleDB](https://www.timescale.com/). It is a product built on the top of Postgres.
 
-## Core table.
+There are following strong points.
 
-There is one core table.
+## Hypertables
 
-``` 
-CREATE TABLE event_history
-(
-    id         UUID       NOT NULL DEFAULT gen_random_uuid(),
-    event_time TIMESTAMP  NOT NULL,
-    username   TEXT       NOT NULL,
-    event_type event_type NOT NULL
-);
-```
+> Each hypertable is made up of child tables called chunks. Each chunk is assigned a range of time, and only contains data from that range.
 
-That table is converted to "hypertable" with "1 hour" chunk interval. Which means that the latest hour is being
-persisted in separate table and also located in the memory.
+Having ranges under individual tables helps to optimize reads/writes. It matches to traffic pattern. 
+1. We need to query the latest pieces of data. And we have those pieces in the memory in relatively small tables.
+2. Writing changes only B-tree index of those small tables.
 
+One-hour chunk is non-realistic value.
 ```sql
-SELECT *
-FROM create_hypertable('event_history', 'event_time');
-
+SELECT * FROM create_hypertable('event_history', 'event_time');
 SELECT set_chunk_time_interval('event_history', INTERVAL '1 hour');
 ```
 
+> We recommend setting the chunk_time_interval so that 25% of main memory can store one chunk, including its indexes, from each active hypertable.
+
+For that app 1Mb handles 10K records (including the tree). So, DB (with 64Gb RAM) chunk size could be calculated as time that is required to ingest ~167 millions entries.
+
 ## Continuous aggregations
 
-Continuous aggregations allow to maintain fast access to per-hour aggregates.
+Continuous aggregations allow to maintain fast access to metrics.
+
+> Continuous aggregate views are refreshed automatically in the background as new data is added, or old data is modified. TimescaleDB tracks these changes to the dataset, and automatically updates the view in the background. This does not add any maintenance burden to your database, and does not slow down INSERT operations. By default, querying continuous aggregates provides you with real-time data. Pre-aggregated data from the materialized view is combined with recent data that hasn't been aggregated yet. This gives you up-to-date results on every query.
 
 Writings are still fast. Re-calculations are happening as schedules background jobs.
-
-So, for old data we have a chance to observe slightly outdated report.
-
-But the latest hour is actual. It is necessary to denote that there is still no full-scan even of the latest chunk.
-Materialized aggregate is being taken into account, and only delta (new records) undergo per-request processing.
-
-```sql
-CREATE
-MATERIALIZED VIEW events_summary_hourly
-    WITH (timescaledb.continuous) AS
-SELECT count(distinct username)                                   AS unique_users,
-       sum(case when event_type = 'click' then 1 else 0 end)      AS total_clicks,
-       sum(case when event_type = 'impression' then 1 else 0 end) AS total_impressions,
-       time_bucket(INTERVAL '1 hour', event_time)                 AS bucket
-FROM event_history
-GROUP BY bucket;
-
-SELECT add_continuous_aggregate_policy(
-               'events_summary_hourly',
-               start_offset = > INTERVAL '1 month',
-               end_offset = > INTERVAL '1 h',
-               schedule_interval = > INTERVAL '10 s');
-```
-
-```
-
-```
+So, for old data we have a chance to observe slightly outdated numbers.
+But the latest hour is actualized all the time. 
+It is necessary to denote that there is still no full-scan even of the latest chunk.
+Materialized aggregate is being taken into account, and only delta (new records) undergo per-request processing. 
+Metrics are "reducible" and could leverage calculated pre-aggregates.

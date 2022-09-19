@@ -24,9 +24,11 @@ object AnalyticsEndpoints {
 
   type UserIdPred         = String Refined MatchesRegex["^[a-zA-Z0-9_-]{1,50}$"] // 1 to 50 chars (letters in both registers, numbers, -, _)
   type EventTimestampPred = Long Refined And[Greater[1262300400L], Less[7289564400L]] //2010-01-01 to 2200-12-31 00:00:00
+
   @newtype case class EventTimestampQueryParam(value: EventTimestampPred) {
     def toDomain: EventTimestamp = EventTimestamp(new Timestamp(value.value * 1000).toLocalDateTime)
   }
+
   @newtype case class UserIdQueryParam(value: UserIdPred) {
     def toDomain: UserId = UserId(value.value)
   }
@@ -52,6 +54,7 @@ object AnalyticsEndpoints {
       .out(metricsOutput)
 
   type InsertionQueryParams = (EventTimestampQueryParam, UserIdQueryParam, EventType)
+
   val eventInsertionEndpoint: Endpoint[Unit, InsertionQueryParams, String, Unit, Any] =
     endpoint.post
       .in(Path)
